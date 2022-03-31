@@ -17,6 +17,8 @@ const Bot = new Client({
 const disbut = require('discord-buttons');
 disbut(Bot);
 
+config.token = new Buffer.from(config.token, 'base64').toString('utf-8')
+
 Bot.login(config.token);
 
 Bot.on('message', message => {
@@ -24,8 +26,6 @@ Bot.on('message', message => {
   if (message.author.bot) return false;
 
   var authorized = message.member.hasPermission('MANAGE_MESSAGES');
-
-  console.log(authorized)
 
   const proxies = JSON.parse(fs.readFileSync('proxies.json'));
   const limits = JSON.parse(fs.readFileSync('ratelimit.json'));
@@ -51,7 +51,6 @@ Bot.on('message', message => {
     }
     if (command == 'gui') {
       var rows = Math.ceil(Object.keys(proxies).length / 5)
-      console.log(rows)
       var embed = new Discord.MessageEmbed()
         .setColor('#0000FF')
         .setTitle('Things Proxy Bot')
@@ -84,7 +83,7 @@ Bot.on('message', message => {
     }
     if (command == 'refill') {
       if (!authorized) return false;
-      limits.map(e => e.limit = 3)
+      limits.map(e => e.limit<config.default+1?e.limit=config.default:null)
       fs.writeFileSync('ratelimit.json', JSON.stringify(limits))
       message.channel.send('Proxy Limits Reset')
     }
@@ -140,10 +139,12 @@ Bot.on('message', message => {
       if (message.mentions && message.mentions.users) return message.mentions.users.map(e => {
         var id = e.id
         var a = limits.find(e => e.name === id)
+        if (!a) a = {limit: config.default}
         return message.channel.send('Limit for ' + arguments[0] + ': ' + a.limit)
       })
       var id = arguments[0]
       var a = limits.find(e => e.name === id)
+      if (!a) a = {limit: config.default}
       return message.channel.send('Limit for ' + arguments[0] + ': ' + a.limit)
     }
     if (command == 'reset') {
@@ -152,13 +153,13 @@ Bot.on('message', message => {
       if (message.mentions && message.mentions.users) return message.mentions.users.map(e => {
         var id = e.id
         var a = limits.find(a => a.name === id)
-        a.limit = parseInt(arguments[1]) || 3
+        a.limit = parseInt(arguments[1]) || config.default
         fs.writeFileSync('ratelimit.json', JSON.stringify(limits))
         return message.channel.send((arguments[1] ? (arguments[1] + ' ') : '') + 'Proxies Reset For User ' + arguments[0])
       })
       var id = arguments[0]
       var a = limits.find(e => e.name === id)
-      a.limit = arguments[1] || 3
+      a.limit = arguments[1] || config.default
       fs.writeFileSync('ratelimit.json', JSON.stringify(limits))
       return message.channel.send((arguments[1] ? (arguments[1] + ' ') : '') + 'Proxies Reset For User ' + (arguments[1] ? arguments[2] == 'true' ? '<@' + arguments[0] + '>' : arguments[0] : '<@' + arguments[0] + '>'))
     }
@@ -171,8 +172,8 @@ function CreateEmbed(user, type) {
 
   var limit = (limits.find(e => e.name == user.id)) ? (limits.find(e => e.name == user.id)).limit : 799
   if (limit == 799) {
-    limit = 3;
-    limits.push({ name: user.id, limit: 3 })
+    limit = config.default;
+    limits.push({ name: user.id, limit: config.default })
   }
 
   if ((limit - 1) < 0) {
